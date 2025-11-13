@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Global Button Counter</title>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial; text-align:center; margin:40px; }
+    .card { display:inline-block; padding:20px; border-radius:12px; box-shadow:0 6px 18px rgba(0,0,0,0.08); }
+    h1 { margin-bottom:8px; }
+    .buttons { margin-top:16px; display:flex; gap:12px; justify-content:center; }
+    button { padding:12px 18px; font-size:16px; cursor:pointer; border-radius:8px; border:1px solid #ddd; background:#fff; }
+    .info { margin-top:12px; color:#333; }
+    .small { font-size:0.9rem; color:#666; margin-top:8px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Global Button Counter</h1>
+    <div class="small">Everyone sees the same counts (stored in Firebase)</div>
+
+    <div class="buttons">
+      <div>
+        <button id="button1">Button 1</button>
+        <div class="info" id="count1">Loading…</div>
+        <div class="small" id="time1"></div>
+      </div>
+
+      <div>
+        <button id="button2">Button 2</button>
+        <div class="info" id="count2">Loading…</div>
+        <div class="small" id="time2"></div>
+      </div>
+
+      <div>
+        <button id="button3">Button 3</button>
+        <div class="info" id="count3">Loading…</div>
+        <div class="small" id="time3"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase compatibility SDKs (simple to drop in) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+  <script>
+    // ===== Replace this object with your Firebase web app config from the console =====
+    const firebaseConfig = {
+      apiKey: "AIzaSyAIyugMsDbtGBzNcrDQgUzrQxMIQAqgVO4",
+      authDomain: "global-button-counter-7ffa6.firebaseapp.com",
+      databaseURL: "https://global-button-counter-7ffa6-default-rtdb.firebaseio.com",
+      projectId: "global-button-counter-7ffa6",
+      storageBucket: "global-button-counter-7ffa6.firebasestorage.app",
+      messagingSenderId: "779296250516",
+      appId: "1:779296250516:web:23999491482b288aebb281",
+      measurementId: "G-FYYENFEG3Q"
+    };
+    // ==================================================================================
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // Buttons we will use
+    const buttons = [1,2,3];
+
+    buttons.forEach(num => {
+      const btn = document.getElementById(`button${num}`);
+      const countEl = document.getElementById(`count${num}`);
+      const timeEl = document.getElementById(`time${num}`);
+      const ref = db.ref(`buttons/button${num}`);
+
+      // Listen for realtime updates
+      ref.on('value', snapshot => {
+        const data = snapshot.val() || {};
+        const count = data.count || 0;
+        const ts = data.lastClick || null;
+        countEl.textContent = `Clicked ${count} time${count === 1 ? '' : 's'}`;
+        if (ts) {
+          const d = new Date(ts);
+          timeEl.textContent = `Last clicked: ${d.toLocaleString()}`;
+        } else {
+          timeEl.textContent = '';
+        }
+      });
+
+      // On click: increment counter and set lastClick using a transaction (safe concurrent update)
+      btn.addEventListener('click', () => {
+        ref.transaction(current => {
+          if (!current) return { count: 1, lastClick: firebase.database.ServerValue.TIMESTAMP };
+          return { count: (current.count || 0) + 1, lastClick: firebase.database.ServerValue.TIMESTAMP };
+        }, (err, committed, snapshot) => {
+          if (err) console.error('Transaction failed:', err);
+          // optional: you can show a brief UI feedback here
+        });
+      });
+    });
+  </script>
+</body>
+</html>
