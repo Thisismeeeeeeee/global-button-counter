@@ -1,157 +1,195 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Button Counter with History + CSV Export</title>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
-
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Global Button Counter + History + CSV (Firestore compat)</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 800px;
-      margin: 40px auto;
-    }
-    button {
-      padding: 10px 20px;
-      margin: 10px;
-      font-size: 16px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 30px;
-    }
-    table th, table td {
-      border: 1px solid #ccc;
-      padding: 8px;
-      text-align: left;
-    }
-    table th {
-      background: #eee;
-    }
+    body{font-family:Arial,Helvetica,sans-serif;max-width:900px;margin:32px auto;}
+    button{padding:10px 14px;margin:6px;font-size:15px;}
+    table{width:100%;border-collapse:collapse;margin-top:18px;}
+    th,td{border:1px solid #ddd;padding:8px;text-align:left;}
+    th{background:#f3f3f3}
   </style>
 </head>
 <body>
+  <h1>Global Button Counter (Firestore)</h1>
 
-<h1>Global Button Counter</h1>
+  <div>
+    <button id="b1">Button 1</button> <span id="count1">0</span>
+  </div>
+  <div>
+    <button id="b2">Button 2</button> <span id="count2">0</span>
+  </div>
+  <div>
+    <button id="b3">Button 3</button> <span id="count3">0</span>
+  </div>
 
-<div>
-  <button onclick="recordClick('button1')">Button 1</button>
-  <span id="count_button1">0</span>
-</div>
+  <h2>History</h2>
+  <button id="exportCSV">Export CSV</button>
+  <table id="historyTable">
+    <thead><tr><th>Timestamp</th><th>Button</th></tr></thead>
+    <tbody></tbody>
+  </table>
 
-<div>
-  <button onclick="recordClick('button2')">Button 2</button>
-  <span id="count_button2">0</span>
-</div>
+  <!-- Firestore COMPAT SDKs (matching the firebase.firestore() API) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
-<div>
-  <button onclick="recordClick('button3')">Button 3</button>
-  <span id="count_button3">0</span>
-</div>
+  <script>
+    // ====== Paste your Firebase config here (from Firebase Console -> Project Settings -> Your apps) ======
+    const firebaseConfig = {
+      apiKey: "AIzaSyAIyugMsDbtGBzNcrDQgUzrQxMIQAqgVO4",
+      authDomain: "global-button-counter-7ffa6.firebaseapp.com",
+      databaseURL: "https://global-button-counter-7ffa6-default-rtdb.firebaseio.com",
+      projectId: "global-button-counter-7ffa6",
+      storageBucket: "global-button-counter-7ffa6.firebasestorage.app",
+      messagingSenderId: "779296250516",
+      appId: "1:779296250516:web:23999491482b288aebb281",
+      measurementId: "G-FYYENFEG3Q",
+      // Note: Firestore does not require databaseURL; that's for Realtime DB
+      // Add other fields if provided (appId, storageBucket, messagingSenderId) — not strictly necessary here
+    };
+    // ================================================================================================
 
-<h2>Click History</h2>
-<button onclick="exportCSV()">Export as CSV</button>
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
 
-<table id="historyTable">
-  <thead>
-    <tr>
-      <th>Timestamp</th>
-      <th>Button</th>
-    </tr>
-  </thead>
-  <tbody></tbody>
-</table>
+    // Helpful debug
+    console.log("Firebase initialized. projectId:", firebaseConfig.projectId);
 
-<script>
-  // --- YOUR FIREBASE CONFIG HERE ---
-  const firebaseConfig = {
-    apiKey: "AIzaSyAIyugMsDbtGBzNcrDQgUzrQxMIQAqgVO4",
-    authDomain: "global-button-counter-7ffa6.firebaseapp.com",
-    databaseURL: "https://global-button-counter-7ffa6-default-rtdb.firebaseio.com",
-    projectId: "global-button-counter-7ffa6",
-    storageBucket: "global-button-counter-7ffa6.firebasestorage.app",
-    messagingSenderId: "779296250516",
-    appId: "1:779296250516:web:23999491482b288aebb281",
-    measurementId: "G-FYYENFEG3Q"
-  };
+    // References
+    const countersDocRef = db.collection('buttonData').doc('counters');
+    const historyColRef = db.collection('buttonHistory');
 
-  const app = firebase.initializeApp(firebaseConfig);
-  const db = firebase.firestore();
-
-  const counterDoc = db.collection("buttonData").doc("counters");
-  const historyCollection = db.collection("buttonHistory");
-
-  // --- Record Button Click ---
-  async function recordClick(buttonName) {
-    const now = new Date();
-
-    // Update counter (increment)
-    await counterDoc.update({
-      [buttonName]: firebase.firestore.FieldValue.increment(1)
-    });
-
-    // Add a history record
-    await historyCollection.add({
-      button: buttonName,
-      timestamp: now
-    });
-  }
-
-  // --- Real-time Counter Listener ---
-  counterDoc.onSnapshot((doc) => {
-    if (doc.exists) {
-      const data = doc.data();
-      document.getElementById("count_button1").textContent = data.button1 || 0;
-      document.getElementById("count_button2").textContent = data.button2 || 0;
-      document.getElementById("count_button3").textContent = data.button3 || 0;
+    // Ensure counters doc exists (create default if missing)
+    async function ensureCountersDoc() {
+      try {
+        const doc = await countersDocRef.get();
+        if (!doc.exists) {
+          console.warn("Counters doc missing — creating with zeros.");
+          await countersDocRef.set({ button1: 0, button2: 0, button3: 0 });
+        } else {
+          console.log("Counters doc exists.");
+        }
+      } catch (err) {
+        console.error("Error checking/creating counters doc:", err);
+      }
     }
-  });
 
-  // --- Real-time History Table Listener ---
-  historyCollection.orderBy("timestamp", "desc").onSnapshot((snapshot) => {
-    const tbody = document.querySelector("#historyTable tbody");
-    tbody.innerHTML = ""; // Clear existing rows
+    // Wire UI
+    const b1 = document.getElementById('b1');
+    const b2 = document.getElementById('b2');
+    const b3 = document.getElementById('b3');
+    const c1 = document.getElementById('count1');
+    const c2 = document.getElementById('count2');
+    const c3 = document.getElementById('count3');
+    const tbody = document.querySelector('#historyTable tbody');
+    const exportBtn = document.getElementById('exportCSV');
 
-    snapshot.forEach(doc => {
-      const record = doc.data();
-      const tr = document.createElement("tr");
+    // Increment + write history using transactions
+    async function recordClick(buttonName) {
+      try {
+        // 1) increment counter atomically
+        await db.runTransaction(async (tx) => {
+          const doc = await tx.get(countersDocRef);
+          if (!doc.exists) {
+            tx.set(countersDocRef, { button1: 0, button2: 0, button3: 0 });
+            docData = { button1:0, button2:0, button3:0 };
+          } else {
+            docData = doc.data();
+          }
+          const prev = docData[buttonName] || 0;
+          const updates = {};
+          updates[buttonName] = prev + 1;
+          tx.update(countersDocRef, updates);
+        });
 
-      const timeStr = record.timestamp.toDate().toLocaleString();
+        // 2) add a history record with server timestamp
+        await historyColRef.add({
+          button: buttonName,
+          ts: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        console.log("Recorded click:", buttonName);
+      } catch (err) {
+        console.error("Error recording click:", err);
+        alert("Error recording click — check console for details.");
+      }
+    }
 
-      tr.innerHTML = `
-        <td>${timeStr}</td>
-        <td>${record.button}</td>
-      `;
-      tbody.appendChild(tr);
-    });
-  });
+    // Set up listeners for real-time updates
+    function startListeners() {
+      // Counters
+      countersDocRef.onSnapshot(doc => {
+        if (!doc.exists) return;
+        const d = doc.data();
+        c1.textContent = d.button1 ?? 0;
+        c2.textContent = d.button2 ?? 0;
+        c3.textContent = d.button3 ?? 0;
+      }, err => console.error("Counters onSnapshot error:", err));
 
-  // --- CSV Export ---
-  async function exportCSV() {
-    const snapshot = await historyCollection.orderBy("timestamp", "asc").get();
+      // History (newest first)
+      historyColRef.orderBy('ts', 'desc').limit(500).onSnapshot(snapshot => {
+        const rows = [];
+        snapshot.forEach(doc => {
+          const r = doc.data();
+          // convert ts
+          let timeStr = "";
+          if (r.ts && r.ts.toDate) timeStr = r.ts.toDate().toLocaleString();
+          else if (r.ts && r.ts.seconds) timeStr = new Date(r.ts.seconds * 1000).toLocaleString();
+          else timeStr = "(pending)";
+          rows.push(`<tr><td>${timeStr}</td><td>${r.button}</td></tr>`);
+        });
+        if (rows.length === 0) {
+          tbody.innerHTML = "<tr><td colspan='2'>No history yet</td></tr>";
+        } else {
+          tbody.innerHTML = rows.join("");
+        }
+      }, err => console.error("History onSnapshot error:", err));
+    }
 
-    let csv = "timestamp,button\n";
+    // CSV export: fetch all history ascending (oldest → newest)
+    async function exportCSV() {
+      try {
+        const snapshot = await historyColRef.orderBy('ts', 'asc').get();
+        const lines = ["timestamp,button"];
+        snapshot.forEach(doc => {
+          const r = doc.data();
+          // ts may be null if serverTimestamp not yet populated; handle gracefully
+          let iso = "";
+          if (r.ts && r.ts.toDate) iso = r.ts.toDate().toISOString();
+          else if (r.ts && r.ts.seconds) iso = new Date(r.ts.seconds * 1000).toISOString();
+          else iso = "";
+          lines.push(`${iso},${r.button}`);
+        });
+        const csv = lines.join("\n");
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'button_history.csv';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        console.error("Export CSV failed:", err);
+        alert("Export failed — check console for details.");
+      }
+    }
 
-    snapshot.forEach(doc => {
-      const r = doc.data();
-      const isoTime = r.timestamp.toDate().toISOString();
-      csv += `${isoTime},${r.button}\n`;
-    });
+    // Attach UI handlers
+    b1.addEventListener('click', () => recordClick('button1'));
+    b2.addEventListener('click', () => recordClick('button2'));
+    b3.addEventListener('click', () => recordClick('button3'));
+    exportBtn.addEventListener('click', exportCSV);
 
-    // Create a downloadable CSV file
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "button_history.csv";
-    a.click();
-
-    URL.revokeObjectURL(url);
-  }
-</script>
-
+    // Init
+    (async function init() {
+      await ensureCountersDoc();
+      startListeners();
+    })();
+  </script>
 </body>
 </html>
