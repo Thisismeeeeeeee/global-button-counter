@@ -21,17 +21,17 @@
 <h1>Global Button Counter (Realtime DB)</h1>
 
 <div>
-  <button id="btn1">Button 1</button>
+  <button id="btn1">Feeding</button>
   <span id="count_button1">0</span>
 </div>
 
 <div>
-  <button id="btn2">Button 2</button>
+  <button id="btn2">Diaper</button>
   <span id="count_button2">0</span>
 </div>
 
 <div>
-  <button id="btn3">Button 3</button>
+  <button id="btn3">Nap</button>
   <span id="count_button3">0</span>
 </div>
 
@@ -79,8 +79,11 @@ document.addEventListener("DOMContentLoaded", function() {
   });
 
   // --- Record click function ---
-  function recordClick(buttonName) {
-    countersRef.child(buttonName).transaction(current => (current || 0) + 1);
+  function recordClick(buttonKey) {
+    countersRef.child(buttonKey).transaction(current => (current || 0) + 1);
+    // Save human-readable button name for history
+    let buttonName = buttonKey === "button1" ? "Feeding" :
+                     buttonKey === "button2" ? "Diaper" : "Nap";
     historyRef.push({
       button: buttonName,
       timestamp: Date.now()
