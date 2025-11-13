@@ -21,22 +21,22 @@
 <h1>Global Button Counter (Realtime DB)</h1>
 
 <div>
-  <button onclick="recordClick('button1')">Button 1</button>
+  <button id="btn1">Button 1</button>
   <span id="count_button1">0</span>
 </div>
 
 <div>
-  <button onclick="recordClick('button2')">Button 2</button>
+  <button id="btn2">Button 2</button>
   <span id="count_button2">0</span>
 </div>
 
 <div>
-  <button onclick="recordClick('button3')">Button 3</button>
+  <button id="btn3">Button 3</button>
   <span id="count_button3">0</span>
 </div>
 
 <h2>Click History</h2>
-<button onclick="exportCSV()">Export as CSV</button>
+<button id="exportCSV">Export as CSV</button>
 
 <table id="historyTable">
   <thead>
@@ -49,22 +49,20 @@
 </table>
 
 <script>
-  // --- INSERT YOUR FIREBASE CONFIG HERE ---
+  // --- Firebase config ---
   const firebaseConfig = {
     apiKey: "AIzaSyAIyugMsDbtGBzNcrDQgUzrQxMIQAqgVO4",
-      authDomain: "global-button-counter-7ffa6.firebaseapp.com",
-      databaseURL: "https://global-button-counter-7ffa6-default-rtdb.firebaseio.com",
-      projectId: "global-button-counter-7ffa6",
-      storageBucket: "global-button-counter-7ffa6.firebasestorage.app",
-      messagingSenderId: "779296250516",
-      appId: "1:779296250516:web:23999491482b288aebb281",
-      measurementId: "G-FYYENFEG3Q",
+    authDomain: "global-button-counter-7ffa6.firebaseapp.com",
+    databaseURL: "https://global-button-counter-7ffa6-default-rtdb.firebaseio.com",
+    projectId: "global-button-counter-7ffa6",
+    storageBucket: "global-button-counter-7ffa6.firebasestorage.app",
+    messagingSenderId: "779296250516",
+    appId: "1:779296250516:web:23999491482b288aebb281",
+    measurementId: "G-FYYENFEG3Q",
   };
-  // -----------------------------------------
 
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
-
   const countersRef = db.ref("counters");
   const historyRef = db.ref("history");
 
@@ -79,21 +77,16 @@
     }
   });
 
-  // Record a click
+  // --- Record click function ---
   function recordClick(buttonName) {
-    // 1) increment counter
-    countersRef.child(buttonName).transaction(current => {
-      return (current || 0) + 1;
-    });
-
-    // 2) add history record
+    countersRef.child(buttonName).transaction(current => (current || 0) + 1);
     historyRef.push({
       button: buttonName,
       timestamp: Date.now()
     });
   }
 
-  // Real-time counter updates
+  // --- Real-time counters ---
   countersRef.on("value", snap => {
     const data = snap.val() || {};
     document.getElementById("count_button1").textContent = data.button1 || 0;
@@ -101,6 +94,54 @@
     document.getElementById("count_button3").textContent = data.button3 || 0;
   });
 
-  // Real-time history table updates
+  // --- Real-time history table ---
+  const tbody = document.querySelector("#historyTable tbody");
   historyRef.limitToLast(500).on("value", snap => {
-    const tbody = document.querySelector("#histor
+    const data = snap.val();
+    tbody.innerHTML = "";
+    if (!data) return;
+    const rows = Object.values(data).sort((a,b) => b.timestamp - a.timestamp);
+    rows.forEach(r => {
+      const tr = document.createElement("tr");
+      const timeStr = new Date(r.timestamp).toLocaleString();
+      tr.innerHTML = `<td>${timeStr}</td><td>${r.button}</td>`;
+      tbody.appendChild(tr);
+    });
+  });
+
+  // --- Export CSV ---
+  function exportCSV() {
+    historyRef.once("value").then(snapshot => {
+      const data = snapshot.val();
+      if (!data) {
+        alert("No history to export.");
+        return;
+      }
+      let csv = "timestamp,button\n";
+      Object.values(data)
+        .sort((a,b) => a.timestamp - b.timestamp)
+        .forEach(r => {
+          csv += `${new Date(r.timestamp).toISOString()},${r.button}\n`;
+        });
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "button_history.csv";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+  }
+
+  // --- Attach event listeners ---
+  document.getElementById("btn1").addEventListener("click", () => recordClick("button1"));
+  document.getElementById("btn2").addEventListener("click", () => recordClick("button2"));
+  document.getElementById("btn3").addEventListener("click", () => recordClick("button3"));
+  document.getElementById("exportCSV").addEventListener("click", exportCSV);
+
+</script>
+
+</body>
+</html>
