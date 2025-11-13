@@ -1,64 +1,195 @@
-<script>
-  // ===== Replace with your Firebase web app config =====
-  const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
-  };
-  // =====================================================
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Global Button Counter + History</title>
 
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
+  <style>
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+      margin: 40px;
+      text-align: center;
+    }
+    .card {
+      display: inline-block;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+      margin-bottom: 40px;
+    }
+    h1 { margin-bottom: 8px; }
+    .buttons {
+      margin-top: 16px;
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+    }
+    button {
+      padding: 12px 18px;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      background: #fff;
+    }
+    .info { margin-top: 10px; color: #333; }
+    .small { font-size: .9rem; color: #666; margin-top: 6px; }
 
-  const buttons = [1,2,3];
+    /* History Table */
+    table {
+      margin: 0 auto;
+      border-collapse: collapse;
+      width: 90%;
+      max-width: 800px;
+      margin-top: 30px;
+      font-size: 15px;
+    }
+    table thead {
+      background: #f5f5f5;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px 10px;
+    }
+    th {
+      font-weight: 600;
+    }
+    tbody tr:nth-child(even) {
+      background: #fafafa;
+    }
+  </style>
+</head>
 
-  buttons.forEach(num => {
-    const btn = document.getElementById(`button${num}`);
-    const countEl = document.getElementById(`count${num}`);
-    const timeEl = document.getElementById(`time${num}`);
-    const ref = db.ref(`buttons/button${num}`);
-    const historyRef = db.ref("history");
+<body>
 
-    // Listen for realtime updates
-    ref.on('value', snapshot => {
-      const data = snapshot.val() || {};
-      const count = data.count || 0;
-      const ts = data.lastClick || null;
+  <!-- Counters -->
+  <div class="card">
+    <h1>Global Button Counter</h1>
+    <div class="small">Everyone sees the same counts (stored in Firebase)</div>
 
-      countEl.textContent = `Clicked ${count} time${count === 1 ? '' : 's'}`;
+    <div class="buttons">
+      <div>
+        <button id="button1">Button 1</button>
+        <div class="info" id="count1">Loading…</div>
+        <div class="small" id="time1"></div>
+      </div>
 
-      if (ts) {
-        const d = new Date(ts);
-        timeEl.textContent = `Last clicked: ${d.toLocaleString()}`;
-      } else {
-        timeEl.textContent = '';
+      <div>
+        <button id="button2">Button 2</button>
+        <div class="info" id="count2">Loading…</div>
+        <div class="small" id="time2"></div>
+      </div>
+
+      <div>
+        <button id="button3">Button 3</button>
+        <div class="info" id="count3">Loading…</div>
+        <div class="small" id="time3"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- History Table -->
+  <h2>Click History</h2>
+  <div class="small">Newest clicks appear first</div>
+
+  <table id="historyTable">
+    <thead>
+      <tr>
+        <th>Button</th>
+        <th>Timestamp</th>
+      </tr>
+    </thead>
+    <tbody id="historyBody">
+      <tr><td colspan="2">Loading history…</td></tr>
+    </tbody>
+  </table>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+  <script>
+    // --------------------------
+    // INSERT YOUR FIREBASE CONFIG
+    // --------------------------
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+    // --------------------------
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const buttons = [1,2,3];
+
+    // --- COUNTERS ---
+    buttons.forEach(num => {
+      const btn = document.getElementById(`button${num}`);
+      const countEl = document.getElementById(`count${num}`);
+      const timeEl = document.getElementById(`time${num}`);
+
+      const ref = db.ref(`buttons/button${num}`);
+      const historyRef = db.ref("history");
+
+      ref.on('value', snapshot => {
+        const data = snapshot.val() || {};
+        const count = data.count || 0;
+        const ts = data.lastClick || null;
+
+        countEl.textContent = `Clicked ${count} time${count === 1 ? '' : 's'}`;
+        timeEl.textContent = ts ? ("Last clicked: " + new Date(ts).toLocaleString()) : "";
+      });
+
+      btn.addEventListener('click', () => {
+        const now = firebase.database.ServerValue.TIMESTAMP;
+
+        // 1) Increment counter
+        ref.transaction(current => {
+          if (!current) return { count: 1, lastClick: now };
+          return { count: (current.count || 0) + 1, lastClick: now };
+        });
+
+        // 2) Log to history list
+        historyRef.push({
+          btn: num,
+          ts: firebase.database.ServerValue.TIMESTAMP
+        });
+      });
+    });
+
+    // --- HISTORY TABLE ---
+    const historyRef = db.ref("history").limitToLast(2000); // change if needed
+    const bodyEl = document.getElementById("historyBody");
+
+    historyRef.on('value', snapshot => {
+      const data = snapshot.val();
+
+      if (!data) {
+        bodyEl.innerHTML = "<tr><td colspan='2'>No history yet</td></tr>";
+        return;
       }
+
+      // Convert object -> array
+      const rows = Object.values(data)
+        .sort((a,b) => b.ts - a.ts); // newest → oldest
+
+      bodyEl.innerHTML = rows.map(r => {
+        const time = new Date(r.ts).toLocaleString();
+        return `
+          <tr>
+            <td>Button ${r.btn}</td>
+            <td>${time}</td>
+          </tr>
+        `;
+      }).join("");
     });
-
-    // On click → increment + log event
-    btn.addEventListener('click', () => {
-      const now = firebase.database.ServerValue.TIMESTAMP;
-
-      // 1) Increment counter using a transaction
-      ref.transaction(current => {
-        if (!current) {
-          return { count: 1, lastClick: now };
-        }
-        return {
-          count: (current.count || 0) + 1,
-          lastClick: now
-        };
-      });
-
-      // 2) Add a new record to history
-      historyRef.push({
-        btn: num,
-        ts: firebase.database.ServerValue.TIMESTAMP
-      });
-    });
-  });
-</script>
+  </script>
+</body>
+</html>
