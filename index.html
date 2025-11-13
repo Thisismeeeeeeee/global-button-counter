@@ -21,18 +21,15 @@
 <h1>Global Button Counter (Realtime DB)</h1>
 
 <div>
-  <button id="btn1">Feeding</button>
-  <span id="count_button1">0</span>
+  <button id="btn1">Feeding: 0</button>
 </div>
 
 <div>
-  <button id="btn2">Diaper</button>
-  <span id="count_button2">0</span>
+  <button id="btn2">Diaper: 0</button>
 </div>
 
 <div>
-  <button id="btn3">Nap</button>
-  <span id="count_button3">0</span>
+  <button id="btn3">Nap: 0</button>
 </div>
 
 <h2>Click History</h2>
@@ -81,7 +78,6 @@ document.addEventListener("DOMContentLoaded", function() {
   // --- Record click function ---
   function recordClick(buttonKey) {
     countersRef.child(buttonKey).transaction(current => (current || 0) + 1);
-    // Save human-readable button name for history
     let buttonName = buttonKey === "button1" ? "Feeding" :
                      buttonKey === "button2" ? "Diaper" : "Nap";
     historyRef.push({
@@ -93,9 +89,9 @@ document.addEventListener("DOMContentLoaded", function() {
   // --- Real-time counters ---
   countersRef.on("value", snap => {
     const data = snap.val() || {};
-    document.getElementById("count_button1").textContent = data.button1 || 0;
-    document.getElementById("count_button2").textContent = data.button2 || 0;
-    document.getElementById("count_button3").textContent = data.button3 || 0;
+    document.getElementById("btn1").textContent = `Feeding: ${data.button1 || 0}`;
+    document.getElementById("btn2").textContent = `Diaper: ${data.button2 || 0}`;
+    document.getElementById("btn3").textContent = `Nap: ${data.button3 || 0}`;
   });
 
   // --- Real-time history table ---
