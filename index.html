@@ -1,196 +1,157 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Global Button Counter + History</title>
+  <meta charset="UTF-8" />
+  <title>Button Counter with History + CSV Export</title>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
 
   <style>
     body {
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial;
-      margin: 40px;
-      text-align: center;
-    }
-    .card {
-      display: inline-block;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 6px 18px rgba(0,0,0,0.08);
-      margin-bottom: 40px;
-    }
-    h1 { margin-bottom: 8px; }
-    .buttons {
-      margin-top: 16px;
-      display: flex;
-      gap: 20px;
-      justify-content: center;
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
     }
     button {
-      padding: 12px 18px;
+      padding: 10px 20px;
+      margin: 10px;
       font-size: 16px;
-      cursor: pointer;
-      border-radius: 8px;
-      border: 1px solid #ddd;
-      background: #fff;
     }
-    .info { margin-top: 10px; color: #333; }
-    .small { font-size: .9rem; color: #666; margin-top: 6px; }
-
-    /* History Table */
     table {
-      margin: 0 auto;
+      width: 100%;
       border-collapse: collapse;
-      width: 90%;
-      max-width: 800px;
       margin-top: 30px;
-      font-size: 15px;
     }
-    table thead {
-      background: #f5f5f5;
+    table th, table td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
     }
-    th, td {
-      border: 1px solid #ddd;
-      padding: 8px 10px;
-    }
-    th {
-      font-weight: 600;
-    }
-    tbody tr:nth-child(even) {
-      background: #fafafa;
+    table th {
+      background: #eee;
     }
   </style>
 </head>
-
 <body>
 
-  <!-- Counters -->
-  <div class="card">
-    <h1>Global Button Counter</h1>
-    <div class="small">Everyone sees the same counts (stored in Firebase)</div>
+<h1>Global Button Counter</h1>
 
-    <div class="buttons">
-      <div>
-        <button id="button1">Button 1</button>
-        <div class="info" id="count1">Loading…</div>
-        <div class="small" id="time1"></div>
-      </div>
+<div>
+  <button onclick="recordClick('button1')">Button 1</button>
+  <span id="count_button1">0</span>
+</div>
 
-      <div>
-        <button id="button2">Button 2</button>
-        <div class="info" id="count2">Loading…</div>
-        <div class="small" id="time2"></div>
-      </div>
+<div>
+  <button onclick="recordClick('button2')">Button 2</button>
+  <span id="count_button2">0</span>
+</div>
 
-      <div>
-        <button id="button3">Button 3</button>
-        <div class="info" id="count3">Loading…</div>
-        <div class="small" id="time3"></div>
-      </div>
-    </div>
-  </div>
+<div>
+  <button onclick="recordClick('button3')">Button 3</button>
+  <span id="count_button3">0</span>
+</div>
 
-  <!-- History Table -->
-  <h2>Click History</h2>
-  <div class="small">Newest clicks appear first</div>
+<h2>Click History</h2>
+<button onclick="exportCSV()">Export as CSV</button>
 
-  <table id="historyTable">
-    <thead>
-      <tr>
-        <th>Button</th>
-        <th>Timestamp</th>
-      </tr>
-    </thead>
-    <tbody id="historyBody">
-      <tr><td colspan="2">Loading history…</td></tr>
-    </tbody>
-  </table>
+<table id="historyTable">
+  <thead>
+    <tr>
+      <th>Timestamp</th>
+      <th>Button</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
 
-  <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+  // --- YOUR FIREBASE CONFIG HERE ---
+  const firebaseConfig = {
+    apiKey: "AIzaSyAIyugMsDbtGBzNcrDQgUzrQxMIQAqgVO4",
+    authDomain: "global-button-counter-7ffa6.firebaseapp.com",
+    databaseURL: "https://global-button-counter-7ffa6-default-rtdb.firebaseio.com",
+    projectId: "global-button-counter-7ffa6",
+    storageBucket: "global-button-counter-7ffa6.firebasestorage.app",
+    messagingSenderId: "779296250516",
+    appId: "1:779296250516:web:23999491482b288aebb281",
+    measurementId: "G-FYYENFEG3Q"
+  };
 
-  <script>
-    // --------------------------
-    // INSERT YOUR FIREBASE CONFIG
-    // --------------------------
-    const firebaseConfig = {
-      apiKey: "AIzaSyAIyugMsDbtGBzNcrDQgUzrQxMIQAqgVO4",
-      authDomain: "global-button-counter-7ffa6.firebaseapp.com",
-      databaseURL: "https://global-button-counter-7ffa6-default-rtdb.firebaseio.com",
-      projectId: "global-button-counter-7ffa6",
-      storageBucket: "global-button-counter-7ffa6.firebasestorage.app",
-      messagingSenderId: "779296250516",
-      appId: "1:779296250516:web:23999491482b288aebb281",
-      measurementId: "G-FYYENFEG3Q"
-    };
-    // --------------------------
+  const app = firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+  const counterDoc = db.collection("buttonData").doc("counters");
+  const historyCollection = db.collection("buttonHistory");
 
-    const buttons = [1,2,3];
+  // --- Record Button Click ---
+  async function recordClick(buttonName) {
+    const now = new Date();
 
-    // --- COUNTERS ---
-    buttons.forEach(num => {
-      const btn = document.getElementById(`button${num}`);
-      const countEl = document.getElementById(`count${num}`);
-      const timeEl = document.getElementById(`time${num}`);
-
-      const ref = db.ref(`buttons/button${num}`);
-      const historyRef = db.ref("history");
-
-      ref.on('value', snapshot => {
-        const data = snapshot.val() || {};
-        const count = data.count || 0;
-        const ts = data.lastClick || null;
-
-        countEl.textContent = `Clicked ${count} time${count === 1 ? '' : 's'}`;
-        timeEl.textContent = ts ? ("Last clicked: " + new Date(ts).toLocaleString()) : "";
-      });
-
-      btn.addEventListener('click', () => {
-        const now = firebase.database.ServerValue.TIMESTAMP;
-
-        // 1) Increment counter
-        ref.transaction(current => {
-          if (!current) return { count: 1, lastClick: now };
-          return { count: (current.count || 0) + 1, lastClick: now };
-        });
-
-        // 2) Log to history list
-        historyRef.push({
-          btn: num,
-          ts: firebase.database.ServerValue.TIMESTAMP
-        });
-      });
+    // Update counter (increment)
+    await counterDoc.update({
+      [buttonName]: firebase.firestore.FieldValue.increment(1)
     });
 
-    // --- HISTORY TABLE ---
-    const historyRef = db.ref("history").limitToLast(2000); // change if needed
-    const bodyEl = document.getElementById("historyBody");
-
-    historyRef.on('value', snapshot => {
-      const data = snapshot.val();
-
-      if (!data) {
-        bodyEl.innerHTML = "<tr><td colspan='2'>No history yet</td></tr>";
-        return;
-      }
-
-      // Convert object -> array
-      const rows = Object.values(data)
-        .sort((a,b) => b.ts - a.ts); // newest → oldest
-
-      bodyEl.innerHTML = rows.map(r => {
-        const time = new Date(r.ts).toLocaleString();
-        return `
-          <tr>
-            <td>Button ${r.btn}</td>
-            <td>${time}</td>
-          </tr>
-        `;
-      }).join("");
+    // Add a history record
+    await historyCollection.add({
+      button: buttonName,
+      timestamp: now
     });
-  </script>
+  }
+
+  // --- Real-time Counter Listener ---
+  counterDoc.onSnapshot((doc) => {
+    if (doc.exists) {
+      const data = doc.data();
+      document.getElementById("count_button1").textContent = data.button1 || 0;
+      document.getElementById("count_button2").textContent = data.button2 || 0;
+      document.getElementById("count_button3").textContent = data.button3 || 0;
+    }
+  });
+
+  // --- Real-time History Table Listener ---
+  historyCollection.orderBy("timestamp", "desc").onSnapshot((snapshot) => {
+    const tbody = document.querySelector("#historyTable tbody");
+    tbody.innerHTML = ""; // Clear existing rows
+
+    snapshot.forEach(doc => {
+      const record = doc.data();
+      const tr = document.createElement("tr");
+
+      const timeStr = record.timestamp.toDate().toLocaleString();
+
+      tr.innerHTML = `
+        <td>${timeStr}</td>
+        <td>${record.button}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  });
+
+  // --- CSV Export ---
+  async function exportCSV() {
+    const snapshot = await historyCollection.orderBy("timestamp", "asc").get();
+
+    let csv = "timestamp,button\n";
+
+    snapshot.forEach(doc => {
+      const r = doc.data();
+      const isoTime = r.timestamp.toDate().toISOString();
+      csv += `${isoTime},${r.button}\n`;
+    });
+
+    // Create a downloadable CSV file
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "button_history.csv";
+    a.click();
+
+    URL.revokeObjectURL(url);
+  }
+</script>
+
 </body>
 </html>
